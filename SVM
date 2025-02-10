@@ -1,0 +1,81 @@
+getwd()
+setwd(dirname(file.choose()))
+# import the CSV file into a data frame
+newobesity<- read.csv(file.choose())
+# general checking for missing values
+apply(newobesity, MARGIN = 2, FUN = function(x) sum(is.na(x)))
+# casewise deletion if necessary
+newobesity <- na.omit(newobesity)
+# Calculating the BMI for the dataset
+newobesity$BMI <- newobesity$Weight / (newobesity$Height ^ 2)
+print(newobesity)
+
+# Define the breakpoints for different obesity levels
+breakpoints <- c(0, 18.5, 24.9, 29.9, 34.9, 39.9, Inf)
+
+# Define labels for the different obesity levels
+labels <- c("Underweight", "Normal weight", "Pre-obesity", "Obesity class I", "Obesity class II", "Obesity class III")
+
+# Create a new column to store obesity levels
+newobesity$obesity_level <- cut(newobesity$BMI, breaks = breakpoints, labels = labels, right = FALSE)
+# drop column 
+newobesity <-newobesity[-5]
+newobesity <-newobesity[-9]
+newobesity <-newobesity[-17]
+#convert the non numeric into numeric variables
+newobesity$Gender <- as.numeric(as.factor(newobesity$Gender))
+newobesity$FAVC <- as.numeric(as.factor(newobesity$FAVC))
+newobesity$CAEC <- as.numeric(as.factor(newobesity$CAEC))
+newobesity$SCC <- as.numeric(as.factor(newobesity$SCC))
+newobesity$CALC <- as.numeric(as.factor(newobesity$CALC))
+newobesity$MTRANS <- as.numeric(as.factor(newobesity$MTRANS))
+newobesity$obesity_level <- as.factor(newobesity$obesity_level)
+newobesity$family_history_with_overweight <- as.numeric(as.factor(newobesity$family_history_with_overweight))
+newobesity$SMOKE <- as.numeric(as.factor(newobesity$SMOKE))
+summary(newobesity)
+
+# check to see if the data is on the same scale
+boxplot(newobesity[-18])
+str(newobesity)
+# future scaling of the dataset
+newobesity[-18]= scale(newobesity[-18])
+boxplot(newobesity[-18])
+
+#correlation matrix
+install.packages(corrplot)
+library(corrplot)
+correlation_matrix <- cor(newobesity[-18])
+#plot the correlation matrix using corrplot
+corrplot(correlation_matrix, method = 'number', type = "upper", tl.col = "blue", tl.srt = 50)
+
+#Support Vector machines 
+
+library(caret)
+library(e1071)
+
+# Assuming "obesity" is the target variable and other columns are features
+X <- newobesity[, -which(names(newobesity) == "obesity_level")]
+y <- newobesity$obesity_level
+
+# Using e1071 for SVM model
+svm_model <- train(X, y, method = "svmLinear")
+
+# 10-fold cross-validation
+ctrl <- trainControl(method = "cv", number = 10)
+cv_model <- train(X, y, method = "svmLinear", trControl = ctrl)
+
+# Split data into training and testing sets (e.g., 90% training, 10% testing)
+set.seed(123) # for reproducibility
+train_index <- createDataPartition(y, p = 0.9, list = FALSE)
+train_data <- newobesity[train_index, ]
+test_data <- newobesity[-train_index, ]
+
+# Fit model on training data
+final_model <- train(X[train_index, ], y[train_index], method = "svmLinear", trControl = ctrl)
+
+# Make predictions on test data
+predictions <- predict(final_model, newdata = X[-train_index, ])
+
+# Create confusion matrix
+confusion_matrix <- confusionMatrix(predictions, test_data$obesity_level, mode = "everything", positive = "obesity_level")
+confusion_matrix
